@@ -33,7 +33,12 @@ class CodeT5Generator(BaseGenerator):
             raise RuntimeError(f"Failed to load AI model '{self.model_name}': {e}")
 
     def generate_docstring(self, code_snippet: str, complexity: str = "concise") -> str:
-        input_ids = self.tokenizer(code_snippet, return_tensors='pt').input_ids.to(self.device)
+        input_ids = self.tokenizer(
+            code_snippet,
+            truncation=True,
+            max_length=512,
+            return_tensors='pt'
+        ).input_ids.to(self.device)
 
         if complexity == "detailed":
             min_len, max_len = 50, 250

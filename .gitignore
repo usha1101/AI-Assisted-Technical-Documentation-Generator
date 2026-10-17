@@ -9,6 +9,19 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Build & Distribution Artifacts
+build/
+dist/
+*.egg-info/
+
+# Model Weights & Hugging Face Cache
+.cache/
+checkpoints/
+*.bin
+*.pt
 
 # Runtime Data & Output Artifacts
 chat_history.json
@@ -22,8 +35,12 @@ results/*.txt
 # IDE & Editor Settings
 .vscode/
 .idea/
+*.swp
+*.tmp
+*~
 
 # OS-generated Files
 .DS_Store
 Thumbs.db
 desktop.ini
+

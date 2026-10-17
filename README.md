@@ -21,6 +21,36 @@ Drafting consistent, accurate technical documentation across large software proj
 4. **Source Code Injection**: Injects newly formatted docstrings directly into the original Python source code file beneath each `def` or `class` header while maintaining precise indentation.
 5. **Dual Interface**: Offers an asynchronous **FastAPI** REST backend and an interactive **Streamlit** dark-themed chat user interface.
 
+```mermaid
+flowchart TD
+    subgraph Client["Client Tier"]
+        UI[Streamlit Web UI<br/>frontend/ui.py]
+        API_CLI[External Scripts / cURL]
+    end
+
+    subgraph Backend["FastAPI Backend (app/main.py)"]
+        Router["REST Router & CORS Middleware"]
+        History["chat_history.json Session Persistence"]
+    end
+
+    subgraph Core["Documentation Pipeline"]
+        Parser["CodeParser (app/parser.py)<br/>Python AST Decomposition"]
+        Gen["AI Generator (app/generator.py)<br/>Salesforce CodeT5 / MockGenerator"]
+        Fmt["DocstringFormatter (app/formatter.py)<br/>Google / Sphinx / NumPy / Concise"]
+        Inj["DocstringInjector (app/injector.py)<br/>Reverse-order Line Injection"]
+    end
+
+    UI --> Router
+    API_CLI --> Router
+    Router --> Parser
+    Parser -->|"AST Entities & Signatures"| Gen
+    Gen -->|"Seq2Seq Summary"| Fmt
+    Fmt -->|"Formatted Docstring"| Inj
+    Inj -->|"Injected Source Code"| Router
+    Router --> History
+```
+
+
 ---
 
 ## 2. Key Features
@@ -132,12 +162,19 @@ pip install -r requirements.txt
 
 ### Option A: Start the FastAPI Backend
 ```bash
+# Production mode (uses CodeT5 local transformer inference)
 python -m app.main
 ```
 - Server URL: **http://127.0.0.1:8000**
 - Interactive Swagger UI: **http://127.0.0.1:8000/docs**
 - Health Check: **http://127.0.0.1:8000/health**
 - *Note: On first startup, the CodeT5 model weights (~890 MB) are automatically downloaded from Hugging Face Hub.*
+
+> [!TIP]
+> **Offline / Rapid Development Mode (`DOCGEN_MODE=mock`)**:
+> To test or develop locally without downloading the 890MB model weights:
+> - **Windows PowerShell**: `$env:DOCGEN_MODE="mock"; python -m app.main`
+> - **Linux / macOS**: `DOCGEN_MODE=mock python -m app.main`
 
 ### Option B: Start the Streamlit Frontend
 In a separate terminal (with `.venv` activated):
@@ -161,13 +198,37 @@ streamlit run frontend/ui.py
 | `/export-markdown` | `POST` | Returns formatted GitHub-flavored Markdown documentation |
 | `/history/{session_id}` | `GET` | Retrieves saved generation history for a specific session |
 
-#### Example Request (`POST /generate-docs`):
-```json
-{
-  "source_code": "def calculate_discount(price: float, discount: float = 0.1) -> float:\n    return price * (1.0 - discount)",
-  "style": "google",
-  "complexity": "concise"
-}
+#### cURL Examples
+
+**1. Generate Docstrings (`POST /generate-docs`):**
+```bash
+curl -X POST "http://127.0.0.1:8000/generate-docs" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "source_code": "def calculate_discount(price: float, discount: float = 0.1) -> float:\n    return price * (1.0 - discount)",
+       "style": "google",
+       "complexity": "concise"
+     }'
+```
+
+**2. Generate Injected Python File (`POST /generate-documented-file`):**
+```bash
+curl -X POST "http://127.0.0.1:8000/generate-documented-file" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "source_code": "def add(a: int, b: int) -> int:\n    return a + b",
+       "style": "google"
+     }'
+```
+
+**3. Export as Markdown Documentation (`POST /export-markdown`):**
+```bash
+curl -X POST "http://127.0.0.1:8000/export-markdown" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "source_code": "class Calculator:\n    def compute(self, x: float) -> float:\n        return x * 2",
+       "style": "numpy"
+     }'
 ```
 
 ---
