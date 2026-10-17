@@ -1,0 +1,29 @@
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Runtime Data & Output Artifacts
+chat_history.json
+results/*.txt
+!results/.gitkeep
+
+# Environment Variables & Secrets
+.env
+*.env
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+
+# OS-generated Files
+.DS_Store
+Thumbs.db
+desktop.ini
