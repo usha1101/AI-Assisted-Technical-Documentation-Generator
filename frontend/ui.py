@@ -5,7 +5,7 @@ import time
 
 # --- CONFIGURATION & STYLING ---
 st.set_page_config(
-    page_title="Gemini-Style DocGen",
+    page_title="AI Technical Doc Generator",
     page_icon="✨",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -13,14 +13,12 @@ st.set_page_config(
 
 API_URL = "http://127.0.0.1:8000"
 
-# --- GEMINI-INSPIRED CSS ---
-# This styles the input bar to look exactly like the screenshot:
-# Dark, rounded, floating in the middle-bottom.
+# --- GEMINI-INSPIRED DARK CSS ---
 st.markdown("""
 <style>
     /* 1. Main Background Colors */
     .stApp {
-        background-color: #131314; /* Gemini Dark Background */
+        background-color: #131314;
         color: #E3E3E3;
     }
 
@@ -30,25 +28,24 @@ st.markdown("""
         border-right: 1px solid #333;
     }
 
-    /* 3. THE FLOATING INPUT BAR (Matches Screenshot) */
+    /* 3. Floating Centered Input Bar */
     .stChatInputContainer {
         padding-bottom: 20px;
         background: transparent !important;
     }
 
     .stChatInputContainer > div {
-        width: 60% !important;  /* Center it like the screenshot */
+        width: 65% !important;
         margin: auto;
-        background-color: #282A2C !important; /* Pill Background */
-        border-radius: 30px !important; /* Fully Rounded */
+        background-color: #282A2C !important;
+        border-radius: 30px !important;
         border: 1px solid #444;
-        padding: 5px 10px; 
+        padding: 5px 12px; 
     }
 
-    /* Remove default focus border to keep it clean */
     .stChatInputContainer textarea:focus {
         box-shadow: none !important;
-        border-color: #444 !important;
+        border-color: #555 !important;
     }
 
     /* 4. Chat Bubbles */
@@ -56,7 +53,7 @@ st.markdown("""
         background-color: transparent !important;
     }
 
-    /* 5. File Uploader Styling to look like a tool */
+    /* 5. Tool Container */
     [data-testid="stFileUploader"] {
         padding: 10px;
         border: 1px dashed #555;
@@ -77,12 +74,21 @@ if "current_user" not in st.session_state:
     st.session_state.current_user = "Guest"
 if "file_content" not in st.session_state:
     st.session_state.file_content = None
+if "file_name" not in st.session_state:
+    st.session_state.file_name = None
+if "last_documented_code" not in st.session_state:
+    st.session_state.last_documented_code = None
+if "last_markdown" not in st.session_state:
+    st.session_state.last_markdown = None
 
 
 # --- ACTIONS ---
 def start_new_chat():
     st.session_state.messages = []
     st.session_state.file_content = None
+    st.session_state.file_name = None
+    st.session_state.last_documented_code = None
+    st.session_state.last_markdown = None
     st.rerun()
 
 
@@ -92,7 +98,7 @@ def login():
         st.session_state.current_user = "user"
         st.rerun()
     else:
-        st.error("Try: user / 1234")
+        st.error("Invalid credentials. Try: user / 1234")
 
 
 def logout():
@@ -101,64 +107,97 @@ def logout():
 
 
 # ==========================================
-# 1. LOGIN
+# 1. SIGN IN SCREEN
 # ==========================================
 if not st.session_state.authenticated:
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
         st.title("✨ Sign In")
+        st.caption("AI-Assisted Technical Documentation Generator")
         st.text_input("Username", key="login_user")
         st.text_input("Password", type="password", key="login_pwd")
         st.button("Continue", on_click=login, type="primary", use_container_width=True)
     st.stop()
 
+
 # ==========================================
-# 2. MAIN INTERFACE
+# 2. MAIN APPLICATION
 # ==========================================
 
-# --- SIDEBAR (Tools & History) ---
+# --- SIDEBAR ---
 with st.sidebar:
-    # 1. NEW CHAT BUTTON (Prominent)
     if st.button("➕ New Chat", type="primary", use_container_width=True):
         start_new_chat()
 
     st.markdown("---")
 
-    # 2. FILE UPLOAD (Mimicking the '+' attachment feel)
-    st.caption("TOOLS")
+    # Options & Style Selector
+    st.caption("CONFIGURATION")
+    selected_style = st.selectbox(
+        "Docstring Style",
+        options=["google", "sphinx", "numpy", "concise", "detailed"],
+        index=0,
+        help="Choose the docstring format to generate."
+    )
+
+    st.markdown("---")
+
+    # File Attachment
+    st.caption("FILE ATTACHMENT")
     uploaded_file = st.file_uploader("Attach a file (.py)", type=["py"], label_visibility="collapsed")
     if uploaded_file:
         st.session_state.file_content = uploaded_file.getvalue().decode("utf-8")
+        st.session_state.file_name = uploaded_file.name
         st.success(f"📎 Attached: {uploaded_file.name}")
+
+    if st.session_state.file_content:
+        if st.button("❌ Remove attached file", use_container_width=True):
+            st.session_state.file_content = None
+            st.session_state.file_name = None
+            st.rerun()
 
     st.markdown("---")
 
-    # 3. HISTORY
-    st.caption("RECENT")
+    # History
+    st.caption("RECENT SESSIONS")
     try:
-        hist = requests.get(f"{API_URL}/history/{st.session_state.session_id}")
-        if hist.status_code == 200:
-            for item in hist.json():
-                # Truncate title for cleaner sidebar
-                title = (item['title'][:18] + '..') if len(item['title']) > 18 else item['title']
-                if st.button(f"💬 {title}", key=item['id']):
-                    st.toast("History loaded (Mock)")
-    except:
-        st.warning("Offline Mode")
+        hist_resp = requests.get(f"{API_URL}/history/{st.session_state.session_id}", timeout=3)
+        if hist_resp.status_code == 200:
+            history_data = hist_resp.json()
+            if history_data:
+                for item in history_data:
+                    title = item.get('title', 'Snippet')
+                    display_title = (title[:18] + '..') if len(title) > 18 else title
+                    if st.button(f"💬 {display_title}", key=item['id'], use_container_width=True):
+                        # Load previous documentation directly into the chat view
+                        st.session_state.messages = []
+                        results = item.get("results", [])
+                        hist_text = f"**Loaded Session:** `{title}` ({item.get('timestamp')})\n\n---\n"
+                        for res in results:
+                            hist_text += f"### `{res['entity_name']}` ({res['entity_type']})\n"
+                            hist_text += f"{res['generated_docstring']}\n\n"
+                            hist_text += f"```python\n{res['original_code']}\n```\n\n---\n"
+                        st.session_state.messages.append({"role": "assistant", "content": hist_text})
+                        st.rerun()
+            else:
+                st.caption("No past sessions yet.")
+    except Exception:
+        st.caption("Backend offline")
 
-    # 4. BOTTOM PROFILE
     st.markdown("---")
     c_p1, c_p2 = st.columns([3, 1])
     c_p1.markdown(f"**{st.session_state.current_user}**")
-    c_p2.button("🚪", on_click=logout)
+    c_p2.button("🚪", on_click=logout, help="Sign out")
+
 
 # --- MAIN CHAT AREA ---
 
-# Welcome Screen (Only if empty)
+# Welcome Screen (Empty State)
 if not st.session_state.messages:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.title(f"Hello, {st.session_state.current_user}")
-    st.markdown("### How can I help verify your code today?")
+    st.markdown("### Paste Python code below or attach a `.py` file to generate documentation.")
 
 # Render Chat History
 for msg in st.session_state.messages:
@@ -168,53 +207,84 @@ for msg in st.session_state.messages:
         else:
             st.write(msg["content"])
 
-# --- THE INPUT FIELD (Bottom, Floating, Centered) ---
-# Note: The CSS above styles this to be a pill shape
-if prompt := st.chat_input("Ask Gemini 3..."):
+# Export Downloads Toolbar (if documented code is available)
+if st.session_state.last_documented_code or st.session_state.last_markdown:
+    st.markdown("### 📥 Export Options")
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        if st.session_state.last_documented_code:
+            st.download_button(
+                label="📄 Download Documented Python Code (.py)",
+                data=st.session_state.last_documented_code,
+                file_name=f"documented_{st.session_state.file_name or 'code.py'}",
+                mime="text/x-python",
+                use_container_width=True
+            )
+    with col_d2:
+        if st.session_state.last_markdown:
+            st.download_button(
+                label="📝 Download Documentation (.md)",
+                data=st.session_state.last_markdown,
+                file_name="documentation.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
+    st.markdown("---")
 
-    # 1. Show User Input
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# --- PROMPT INPUT BAR ---
+if prompt := st.chat_input("Paste Python code or type a query..."):
+
+    # Show User Input
+    display_prompt = f"```python\n{prompt}\n```" if ("def " in prompt or "class " in prompt) else prompt
+    st.session_state.messages.append({"role": "user", "content": display_prompt})
     with st.chat_message("user", avatar="🧑‍💻"):
-        st.write(prompt)
+        st.markdown(display_prompt)
 
-    # 2. Determine Code Context
-    # If a file is attached, we send that. If not, we check if the user pasted code.
+    # Determine code to process
     final_code = st.session_state.file_content if st.session_state.file_content else prompt
 
-    # 3. Generate Answer
+    # Generate Documentation
     with st.chat_message("assistant", avatar="✨"):
-        # Status Indicator (The "Thinking" state)
-        with st.status("Analyzing...", expanded=True) as status:
-            time.sleep(0.5)  # UX Delay
+        with st.status("Analyzing code & generating documentation...", expanded=True) as status:
+            time.sleep(0.2)
 
             try:
                 payload = {
                     "source_code": final_code,
-                    "complexity": "detailed",
+                    "complexity": "detailed" if selected_style == "detailed" else "concise",
+                    "style": selected_style,
                     "save_history": True,
                     "session_id": st.session_state.session_id
                 }
 
-                response = requests.post(f"{API_URL}/generate-docs", json=payload)
+                # 1. Generate Documented File
+                file_resp = requests.post(f"{API_URL}/generate-documented-file", json=payload, timeout=60)
 
-                if response.status_code == 200:
-                    data = response.json()
+                # 2. Export Markdown
+                md_resp = requests.post(f"{API_URL}/export-markdown", json=payload, timeout=60)
+
+                if file_resp.status_code == 200:
+                    data = file_resp.json()
                     results = data.get("results", [])
+                    st.session_state.last_documented_code = data.get("documented_code", "")
+                    if md_resp.status_code == 200:
+                        st.session_state.last_markdown = md_resp.text
 
-                    answer_text = ""
+                    answer_text = f"### ✨ Generated Documentation ({len(results)} entities found)\n\n"
                     for item in results:
-                        answer_text += f"### {item['entity_name']} ({item['entity_type']})\n"
-                        answer_text += f"{item['generated_docstring']}\n\n"
+                        answer_text += f"#### `{item['entity_name']}` ({item['entity_type']})\n"
+                        answer_text += f"```text\n{item['generated_docstring']}\n```\n"
                         answer_text += f"```python\n{item['original_code']}\n```\n\n---\n"
 
                     status.update(label="Complete", state="complete", expanded=False)
                     st.markdown(answer_text)
                     st.session_state.messages.append({"role": "assistant", "content": answer_text})
+                    st.rerun()
 
                 else:
                     status.update(label="Error", state="error")
-                    st.error(f"Backend Error: {response.text}")
+                    st.error(f"Backend Error ({file_resp.status_code}): {file_resp.text}")
 
             except Exception as e:
                 status.update(label="Connection Failed", state="error")
-                st.error(f"Error: {e}")
+                st.error(f"Could not reach backend: {e}")

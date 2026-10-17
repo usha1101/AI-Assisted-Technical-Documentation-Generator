@@ -1,41 +1,52 @@
 # AI-Assisted Technical Documentation Generator
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
-[![HuggingFace](https://img.shields.io/badge/Model-Salesforce%2Fcodet5--base--multi--sum-yellow.svg)](https://huggingface.co/Salesforce/codet5-base-multi-sum)
+[![Python](https://img.shields.io/badge/Python-3.9+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-FF4B4B.svg?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![HuggingFace](https://img.shields.io/badge/Model-Salesforce%2Fcodet5--base--multi--sum-FFD21E.svg?logo=huggingface&logoColor=black)](https://huggingface.co/Salesforce/codet5-base-multi-sum)
+[![Tests](https://img.shields.io/badge/Tests-22%20Passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An intelligent Python documentation system that decomposes source code using Python's native Abstract Syntax Tree (**AST**) and generates accurate, natural language docstrings and technical explanations using the **Salesforce CodeT5** transformer model.
+An intelligent Python documentation and docstring generation system that combines Python's native Abstract Syntax Tree (**AST**) analysis with the **Salesforce CodeT5** sequence-to-sequence transformer model. Automatically parses code structures, produces standard docstrings (Google, Sphinx, NumPy, or Concise), and injects them back into source code files.
 
 ---
 
 ## 1. Project Overview
 
-Drafting comprehensive docstrings and technical documentation for large codebases is repetitive and time-consuming. This tool automates the process:
+Drafting consistent, accurate technical documentation across large software projects is repetitive and time-consuming. This system automates the documentation workflow through:
 
-1. **Structural Analysis**: Inspects Python code using the `ast` module to isolate top-level functions, classes, and class methods.
-2. **Local AI Summarization**: Feeds code snippets into `Salesforce/codet5-base-multi-sum`, a specialized sequence-to-sequence code summarization model running locally via Hugging Face `transformers` and PyTorch.
-3. **Multi-Interface Access**: Provides both a high-performance **FastAPI** REST backend and an interactive **Streamlit** dark-themed chat UI.
+1. **AST Structural Decomposition**: Inspects Python code using the `ast` module to identify functions, classes, and methods, extracting argument types, default values, return annotations, decorators, and explicitly raised exceptions.
+2. **Transformer Code Summarization**: Employs `Salesforce/codet5-base-multi-sum` (~890 MB) locally via Hugging Face Transformers and PyTorch to generate natural language descriptions of what each code entity does.
+3. **Multi-Style Formatting**: Converts raw AI summaries into industry-standard docstrings (**Google Style**, **Sphinx / reST**, **NumPy**, or **Concise Summary**).
+4. **Source Code Injection**: Injects newly formatted docstrings directly into the original Python source code file beneath each `def` or `class` header while maintaining precise indentation.
+5. **Dual Interface**: Offers an asynchronous **FastAPI** REST backend and an interactive **Streamlit** dark-themed chat user interface.
 
 ---
 
 ## 2. Key Features
 
-- **Interactive Streamlit UI**: Modern, dark-mode interface with floating prompt bar, Python (`.py`) file attachment, and session history tracking.
-- **Precision AST Parsing**:
-  - Automatically identifies functions, classes, and methods.
-  - Ignores private/internal helper functions to prevent documentation clutter.
-  - Accurately captures decorators (e.g., `@staticmethod`, `@functools.wraps`).
+- **Intelligent AST Parsing**:
+  - Extracts top-level functions, classes, and class methods.
+  - Automatically isolates parameters, type hints, default values, `*args`, and `**kwargs`.
+  - Detects explicit `raise` exception types without descending into nested scopes.
+  - Catches syntax errors with line numbers, column offsets, and error descriptions.
+- **Multiple Docstring Formats**:
+  - **Google Style** (`Args:`, `Returns:`, `Raises:`)
+  - **Sphinx Style** (`:param:`, `:type:`, `:return:`, `:raises:`)
+  - **NumPy Style** (`Parameters`, `Returns`, `Raises`)
+  - **Concise / Detailed Summary** (single-block explanations)
+- **Docstring Injection Engine**:
+  - Automatically updates source code by inserting generated docstrings with accurate indentation.
+  - Replaces existing docstrings cleanly without duplicating blocks or breaking syntax.
 - **Local AI Inference**:
-  - Powered by `Salesforce/codet5-base-multi-sum` (~890 MB).
-  - Runs offline without requiring external paid API keys (OpenAI, Gemini, etc.).
-  - Supports both **concise** and **detailed** complexity modes.
-- **Robust REST API**:
-  - FastAPI-powered backend with automatic Swagger documentation (`/docs`).
-  - Session-isolated generation history.
-- **Automated Stress Testing**:
-  - Includes test scripts to validate against complex OOP patterns, decorators, and exception handling, logging timestamped reports to `results/`.
+  - Powered by `Salesforce/codet5-base-multi-sum`.
+  - Runs 100% locally on CPU or CUDA GPU without requiring external paid API keys (OpenAI, Gemini, etc.).
+- **Pluggable Architecture**:
+  - Production `CodeT5Generator` for real model inference.
+  - Rule-based `MockGenerator` for rapid offline development, CI/CD pipelines, and automated testing (`DOCGEN_MODE=mock`).
+- **Modern REST API & Interactive UI**:
+  - Asynchronous FastAPI server with Swagger documentation at `/docs` and health diagnostics at `/health`.
+  - Streamlit web interface with real history restoration, docstring style selector, file upload, and one-click download buttons (`.py` and `.md`).
 
 ---
 
@@ -43,13 +54,14 @@ Drafting comprehensive docstrings and technical documentation for large codebase
 
 | Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Backend Framework** | FastAPI | High-performance asynchronous REST API framework |
-| **Server** | Uvicorn | ASGI web server |
-| **Frontend UI** | Streamlit | Chat-based web user interface |
-| **Parsing Engine** | Python `ast` | Abstract Syntax Tree parsing & source segmentation |
-| **AI / ML** | Transformers & PyTorch | Hugging Face implementation of `Salesforce/codet5-base-multi-sum` |
-| **Validation** | Pydantic | Typed schemas and request validation |
-| **Storage** | JSON Flat File | Lightweight session history store |
+| **Backend Framework** | FastAPI | Asynchronous REST API framework with OpenAPI documentation |
+| **Web Server** | Uvicorn | High-performance ASGI server |
+| **Frontend UI** | Streamlit | Interactive web chat interface with custom dark theme |
+| **AST Parser** | Python `ast` | Native Abstract Syntax Tree analysis and source segmentation |
+| **AI / Machine Learning** | Hugging Face Transformers & PyTorch | Local execution of `Salesforce/codet5-base-multi-sum` |
+| **Docstring Formatting** | Python | Standard formatting engine (Google, Sphinx, NumPy) |
+| **Data Validation** | Pydantic v2 | Typed schemas and request payload validation |
+| **Testing** | Pytest & HTTPX | Automated unit and integration test suite |
 
 ---
 
@@ -59,13 +71,21 @@ Drafting comprehensive docstrings and technical documentation for large codebase
 AI-Assisted-Technical-Documentation-Generator/
 ├── app/
 │   ├── __init__.py
-│   ├── generator.py       # CodeT5 model integration (DocGenerator)
-│   ├── main.py            # FastAPI application routes & server entry point
-│   ├── models.py          # Pydantic request and response schemas
+│   ├── formatter.py       # Multi-style docstring formatter (Google, Sphinx, NumPy)
+│   ├── generator.py       # Pluggable generator architecture (CodeT5 & MockGenerator)
+│   ├── injector.py        # Source code docstring injection engine
+│   ├── main.py            # FastAPI REST routes, CORS, history, and health endpoints
+│   ├── models.py          # Pydantic schemas (CodeRequest, DocStringResponse, etc.)
 │   └── parser.py          # AST extraction logic (CodeParser)
 ├── frontend/
-│   └── ui.py              # Streamlit interactive chat interface
-├── results/               # Directory for automated test log outputs
+│   └── ui.py              # Streamlit dark-mode interactive chat interface
+├── tests/
+│   ├── __init__.py
+│   ├── test_api_client.py # FastAPI integration tests using TestClient
+│   ├── test_formatter.py  # Unit tests for docstring formatting
+│   ├── test_injector.py   # Unit tests for source code injection
+│   └── test_parser.py     # Unit tests for AST parsing and error handling
+├── results/               # Directory for test summary logs
 │   └── .gitkeep
 ├── .gitignore             # Git ignore definitions
 ├── LICENSE                # MIT License
@@ -81,7 +101,7 @@ AI-Assisted-Technical-Documentation-Generator/
 
 ### Prerequisites
 - Python 3.9, 3.10, or 3.11 installed.
-- (Optional) NVIDIA GPU with CUDA support for accelerated inference.
+- (Optional) NVIDIA GPU with CUDA for accelerated transformer inference.
 
 ### 1. Clone the Repository
 ```bash
@@ -89,16 +109,16 @@ git clone https://github.com/usha1101/AI-Assisted-Technical-Documentation-Genera
 cd AI-Assisted-Technical-Documentation-Generator
 ```
 
-### 2. Create and Activate a Virtual Environment
+### 2. Set Up Virtual Environment
 - **Windows (PowerShell):**
   ```powershell
-  python -m venv venv
-  .\venv\Scripts\activate
+  python -m venv --system-site-packages .venv
+  .\.venv\Scripts\activate
   ```
 - **macOS / Linux:**
   ```bash
-  python3 -m venv venv
-  source venv/bin/activate
+  python3 -m venv .venv
+  source .venv/bin/activate
   ```
 
 ### 3. Install Dependencies
@@ -111,48 +131,68 @@ pip install -r requirements.txt
 ## 6. Running the Application
 
 ### Option A: Start the FastAPI Backend
-Launch the backend server:
 ```bash
 python -m app.main
 ```
-- The backend starts at: `http://127.0.0.1:8000`
-- Interactive API documentation (Swagger UI): `http://127.0.0.1:8000/docs`
-- *Note: On the first launch, the AI model weights (~890 MB) will be downloaded automatically.*
+- Server URL: **http://127.0.0.1:8000**
+- Interactive Swagger UI: **http://127.0.0.1:8000/docs**
+- Health Check: **http://127.0.0.1:8000/health**
+- *Note: On first startup, the CodeT5 model weights (~890 MB) are automatically downloaded from Hugging Face Hub.*
 
 ### Option B: Start the Streamlit Frontend
-In a new terminal (with the virtual environment activated):
+In a separate terminal (with `.venv` activated):
 ```bash
 streamlit run frontend/ui.py
 ```
-- Open your browser at: `http://localhost:8501`
+- Access in browser: **http://localhost:8501**
 - **Default Sign-in Credentials**:
   - **Username**: `user`
   - **Password**: `1234`
 
 ---
 
-## 7. Running Automated Tests
+## 7. API Reference
 
-Ensure the FastAPI backend is running (`python -m app.main`), then execute:
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/health` | `GET` | Returns generator status, compute device (`cpu`/`cuda`), and timestamp |
+| `/generate-docs` | `POST` | Parses code and returns generated docstrings with entity metadata |
+| `/generate-documented-file` | `POST` | Injects generated docstrings directly into the source code |
+| `/export-markdown` | `POST` | Returns formatted GitHub-flavored Markdown documentation |
+| `/history/{session_id}` | `GET` | Retrieves saved generation history for a specific session |
 
-- **Quick API Test:**
-  ```bash
-  python test_api.py
-  ```
-
-- **Complex Stress Test:**
-  ```bash
-  python run_complex_test.py
-  ```
-  *(Results will print in the console and save a timestamped summary log in the `results/` folder).*
+#### Example Request (`POST /generate-docs`):
+```json
+{
+  "source_code": "def calculate_discount(price: float, discount: float = 0.1) -> float:\n    return price * (1.0 - discount)",
+  "style": "google",
+  "complexity": "concise"
+}
+```
 
 ---
 
-## 8. License & Attribution
+## 8. Running Automated Tests
 
-This project is open-source and distributed under the **[MIT License](LICENSE)**.
+Run the complete test suite with `pytest`:
+```bash
+pytest -v
+```
+
+All 22 unit and integration tests validate:
+- Top-level function, class, and method AST parsing.
+- Argument types, defaults, return annotations, and raised exceptions.
+- Google, Sphinx, NumPy, and Concise formatting.
+- In-place docstring injection and syntax preservation.
+- FastAPI endpoints (`/health`, `/generate-docs`, `/generate-documented-file`, `/export-markdown`, `/history`).
+
+---
+
+## 9. License & Attribution
+
+Distributed under the **[MIT License](LICENSE)**.
 
 ### Acknowledgments & Attribution
-- **Original Author**: [Nithin Reddy](https://github.com/nithinreddy18) ([@nithinreddy18](https://github.com/nithinreddy18))
-- **Maintainer**: [Usha](https://github.com/usha1101) ([@usha1101](https://github.com/usha1101))
-- **Model**: [Salesforce CodeT5](https://github.com/salesforce/CodeT5) / [Salesforce/codet5-base-multi-sum](https://huggingface.co/Salesforce/codet5-base-multi-sum) on Hugging Face
+- **Original Concept & Model Integration**: [Nithin Reddy](https://github.com/nithinreddy18) ([@nithinreddy18](https://github.com/nithinreddy18))
+- **Enhanced Architecture, AST Extraction, Injection Engine & Maintainer**: [Usha](https://github.com/usha1101) ([@usha1101](https://github.com/usha1101))
+- **Pre-trained Model**: [Salesforce CodeT5](https://huggingface.co/Salesforce/codet5-base-multi-sum) on Hugging Face
